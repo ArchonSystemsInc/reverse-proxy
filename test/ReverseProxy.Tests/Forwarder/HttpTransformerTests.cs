@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 using System;
+using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -35,13 +37,6 @@ public class HttpTransformerTests
         HeaderNames.AltSvc,
 #else
         "Alt-Svc",
-#endif
-#if NET6_0_OR_GREATER
-        HeaderNames.TraceParent,
-        HeaderNames.RequestId,
-        HeaderNames.TraceState,
-        HeaderNames.Baggage,
-        HeaderNames.CorrelationContext,
 #endif
     };
 
