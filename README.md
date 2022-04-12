@@ -10,13 +10,15 @@ We expect YARP to ship as a library and project template that together provide a
 
 For regular updates, see our [releases page](https://github.com/microsoft/reverse-proxy/releases). Subscribe to release notifications on this repository to be notified of future updates (Watch -> Custom -> Releases).
 
+If you want to live on the bleeding edge, you can pickup the [daily builds](/docs/DailyBuilds.md).
+
 # Build
 
 To build the repo, you should only need to run `build.cmd` (on Windows) or `build.sh` (on Linux or macOS). The script will download the .NET SDK and build the solution.
 
-For VS on Windows, you can run the `startvs.cmd` script to launch Visual Studio on Windows using the appropriate local copy of the .NET SDK.
+For VS on Windows, install the latest [VS 2022](https://visualstudio.microsoft.com/downloads/) release and then run the `startvs.cmd` script to launch Visual Studio using the appropriate local copy of the .NET SDK.
 
-To set up local development with Visual Studio, Visual Studio for Mac or Visual Studio Code, you need to put the local copy of the .NET SDK in your `PATH` environment variable. Our `Restore` script fetches the latest build of .NET 5 and installs it to a `.dotnet` directory *within* this repository.
+To set up local development with Visual Studio, Visual Studio for Mac or Visual Studio Code, you need to put the local copy of the .NET SDK in your `PATH` environment variable. Our `Restore` script fetches the latest build of .NET and installs it to a `.dotnet` directory *within* this repository.
 
 We provide some scripts to set all this up for you. Just follow these steps:
 
@@ -31,6 +33,12 @@ When you're done, you can run the `deactivate` function to undo the changes to y
 
 If you're having trouble building the project, or developing in Visual Studio, please file an issue to let us know and we'll help out (and fix our scripts/tools as needed)!
 
+# Testing
+
+The command to build and run all tests: `build.cmd/sh -test`.
+To run specific test you may use XunitMethodName property: `dotnet build /t:Test /p:XunitMethodName={FullyQualifiedNamespace}.{ClassName}.{MethodName}`.
+The tests can also be run from Visual Studio if launched using `startvs.cmd`.
+
 # Getting started
 
 - See our [Getting Started](https://microsoft.github.io/reverse-proxy/articles/getting-started.html) docs.
@@ -39,7 +47,7 @@ If you're having trouble building the project, or developing in Visual Studio, p
 
 # Roadmap
 
-Coming Soon
+see [docs/roadmap.md](/docs/roadmap.md)
 
 # Reporting security issues and bugs
 
