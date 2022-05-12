@@ -6,6 +6,12 @@ YARP is a reverse proxy toolkit for building fast proxy servers in .NET using th
 
 We expect YARP to ship as a library and project template that together provide a robust, performant proxy server. Its pipeline and modules are designed so that you can then customize the functionality for your needs. For example, while YARP supports configuration files, we expect that many users will want to manage the configuration programmatically based on their own backend configuration management system, YARP will provide a configuration API to enable that customization in-proc.  YARP is designed with customizability as a primary scenario, rather than requiring you to break out to script or having to rebuild from source.
 
+# Getting started
+
+- See our [Getting Started](https://microsoft.github.io/reverse-proxy/articles/getting-started.html) docs.
+- Try our [previews](https://github.com/microsoft/reverse-proxy/releases).
+- Try our latest [daily build](/docs/DailyBuilds.md).
+
 # Updates
 
 For regular updates, see our [releases page](https://github.com/microsoft/reverse-proxy/releases). Subscribe to release notifications on this repository to be notified of future updates (Watch -> Custom -> Releases).
@@ -39,19 +45,11 @@ The command to build and run all tests: `build.cmd/sh -test`.
 To run specific test you may use XunitMethodName property: `dotnet build /t:Test /p:XunitMethodName={FullyQualifiedNamespace}.{ClassName}.{MethodName}`.
 The tests can also be run from Visual Studio if launched using `startvs.cmd`.
 
-# Getting started
-
-- See our [Getting Started](https://microsoft.github.io/reverse-proxy/articles/getting-started.html) docs.
-- Try our [previews](https://github.com/microsoft/reverse-proxy/releases).
-- Try our latest [daily build](/docs/DailyBuilds.md).
-
 # Roadmap
 
 see [docs/roadmap.md](/docs/roadmap.md)
 
 # Reporting security issues and bugs
-
-YARP is a preview project, and as such we expect all users to take responsibility for evaluating the security of their own applications.
 
 Security issues and bugs should be reported privately, via email, to the Microsoft Security Response Center (MSRC) at `secure@microsoft.com`. You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Further information, including [the MSRC PGP key](https://www.microsoft.com/msrc/pgp-key-msrc), can be found at the [Microsoft Security Response Center](https://www.microsoft.com/msrc).
 

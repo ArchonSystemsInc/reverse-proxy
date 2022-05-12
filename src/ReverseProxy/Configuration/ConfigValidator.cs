@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing.Patterns;
+using Microsoft.Extensions.Logging;
 using Yarp.ReverseProxy.Health;
 using Yarp.ReverseProxy.LoadBalancing;
 using Yarp.ReverseProxy.SessionAffinity;
@@ -34,6 +35,7 @@ internal sealed class ConfigValidator : IConfigValidator
     private readonly IDictionary<string, IAvailableDestinationsPolicy> _availableDestinationsPolicies;
     private readonly IDictionary<string, IActiveHealthCheckPolicy> _activeHealthCheckPolicies;
     private readonly IDictionary<string, IPassiveHealthCheckPolicy> _passiveHealthCheckPolicies;
+    private readonly ILogger _logger;
 
 
     public ConfigValidator(ITransformBuilder transformBuilder,
@@ -43,7 +45,8 @@ internal sealed class ConfigValidator : IConfigValidator
         IEnumerable<IAffinityFailurePolicy> affinityFailurePolicies,
         IEnumerable<IAvailableDestinationsPolicy> availableDestinationsPolicies,
         IEnumerable<IActiveHealthCheckPolicy> activeHealthCheckPolicies,
-        IEnumerable<IPassiveHealthCheckPolicy> passiveHealthCheckPolicies)
+        IEnumerable<IPassiveHealthCheckPolicy> passiveHealthCheckPolicies,
+        ILogger<ConfigValidator> logger)
     {
         _transformBuilder = transformBuilder ?? throw new ArgumentNullException(nameof(transformBuilder));
         _authorizationPolicyProvider = authorizationPolicyProvider ?? throw new ArgumentNullException(nameof(authorizationPolicyProvider));
@@ -53,6 +56,7 @@ internal sealed class ConfigValidator : IConfigValidator
         _availableDestinationsPolicies = availableDestinationsPolicies?.ToDictionaryByUniqueId(p => p.Name) ?? throw new ArgumentNullException(nameof(availableDestinationsPolicies));
         _activeHealthCheckPolicies = activeHealthCheckPolicies?.ToDictionaryByUniqueId(p => p.Name) ?? throw new ArgumentNullException(nameof(activeHealthCheckPolicies));
         _passiveHealthCheckPolicies = passiveHealthCheckPolicies?.ToDictionaryByUniqueId(p => p.Name) ?? throw new ArgumentNullException(nameof(passiveHealthCheckPolicies));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     // Note this performs all validation steps without short circuiting in order to report all possible errors.
@@ -70,13 +74,13 @@ internal sealed class ConfigValidator : IConfigValidator
         await ValidateAuthorizationPolicyAsync(errors, route.AuthorizationPolicy, route.RouteId);
         await ValidateCorsPolicyAsync(errors, route.CorsPolicy, route.RouteId);
 
-        if (route.Match == null)
+        if (route.Match is null)
         {
             errors.Add(new ArgumentException($"Route '{route.RouteId}' did not set any match criteria, it requires Hosts or Path specified. Set the Path to '/{{**catchall}}' to match all requests."));
             return errors;
         }
 
-        if ((route.Match.Hosts == null || !route.Match.Hosts.Any(host => !string.IsNullOrEmpty(host))) && string.IsNullOrEmpty(route.Match.Path))
+        if ((route.Match.Hosts is null || !route.Match.Hosts.Any(host => !string.IsNullOrEmpty(host))) && string.IsNullOrEmpty(route.Match.Path))
         {
             errors.Add(new ArgumentException($"Route '{route.RouteId}' requires Hosts or Path specified. Set the Path to '/{{**catchall}}' to match all requests."));
         }
@@ -114,7 +118,7 @@ internal sealed class ConfigValidator : IConfigValidator
     private static void ValidateHost(IList<Exception> errors, IReadOnlyList<string>? hosts, string routeId)
     {
         // Host is optional when Path is specified
-        if (hosts == null || hosts.Count == 0)
+        if (hosts is null || hosts.Count == 0)
         {
             return;
         }
@@ -153,7 +157,7 @@ internal sealed class ConfigValidator : IConfigValidator
     private static void ValidateMethods(IList<Exception> errors, IReadOnlyList<string>? methods, string routeId)
     {
         // Methods are optional
-        if (methods == null)
+        if (methods is null)
         {
             return;
         }
@@ -177,14 +181,14 @@ internal sealed class ConfigValidator : IConfigValidator
     private static void ValidateHeaders(List<Exception> errors, IReadOnlyList<RouteHeader>? headers, string routeId)
     {
         // Headers are optional
-        if (headers == null)
+        if (headers is null)
         {
             return;
         }
 
         foreach (var header in headers)
         {
-            if (header == null)
+            if (header is null)
             {
                 errors.Add(new ArgumentException($"A null route header has been set for route '{routeId}'."));
                 continue;
@@ -196,7 +200,7 @@ internal sealed class ConfigValidator : IConfigValidator
             }
 
             if (header.Mode != HeaderMatchMode.Exists
-                && (header.Values == null || header.Values.Count == 0))
+                && (header.Values is null || header.Values.Count == 0))
             {
                 errors.Add(new ArgumentException($"No header values were set on route header '{header.Name}' for route '{routeId}'."));
             }
@@ -211,14 +215,14 @@ internal sealed class ConfigValidator : IConfigValidator
     private static void ValidateQueryParameters(List<Exception> errors, IReadOnlyList<RouteQueryParameter>? queryparams, string routeId)
     {
         // Query Parameters are optional
-        if (queryparams == null)
+        if (queryparams is null)
         {
             return;
         }
 
         foreach (var queryparam in queryparams)
         {
-            if (queryparam == null)
+            if (queryparam is null)
             {
                 errors.Add(new ArgumentException($"A null route query parameter has been set for route '{routeId}'."));
                 continue;
@@ -230,7 +234,7 @@ internal sealed class ConfigValidator : IConfigValidator
             }
 
             if (queryparam.Mode != QueryParameterMatchMode.Exists
-                && (queryparam.Values == null || queryparam.Values.Count == 0))
+                && (queryparam.Values is null || queryparam.Values.Count == 0))
             {
                 errors.Add(new ArgumentException($"No query parameter values were set on route query parameter '{queryparam.Name}' for route '{routeId}'."));
             }
@@ -252,7 +256,7 @@ internal sealed class ConfigValidator : IConfigValidator
         if (string.Equals(AuthorizationConstants.Default, authorizationPolicyName, StringComparison.OrdinalIgnoreCase))
         {
             var policy = await _authorizationPolicyProvider.GetPolicyAsync(authorizationPolicyName);
-            if (policy != null)
+            if (policy is not null)
             {
                 errors.Add(new ArgumentException($"The application has registered an authorization policy named '{authorizationPolicyName}' that conflicts with the reserved authorization policy name used on this route. The registered policy name needs to be changed for this route to function."));
             }
@@ -262,7 +266,7 @@ internal sealed class ConfigValidator : IConfigValidator
         if (string.Equals(AuthorizationConstants.Anonymous, authorizationPolicyName, StringComparison.OrdinalIgnoreCase))
         {
             var policy = await _authorizationPolicyProvider.GetPolicyAsync(authorizationPolicyName);
-            if (policy != null)
+            if (policy is not null)
             {
                 errors.Add(new ArgumentException($"The application has registered an authorization policy named '{authorizationPolicyName}' that conflicts with the reserved authorization policy name used on this route. The registered policy name needs to be changed for this route to function."));
             }
@@ -272,7 +276,7 @@ internal sealed class ConfigValidator : IConfigValidator
         try
         {
             var policy = await _authorizationPolicyProvider.GetPolicyAsync(authorizationPolicyName);
-            if (policy == null)
+            if (policy is null)
             {
                 errors.Add(new ArgumentException($"Authorization policy '{authorizationPolicyName}' not found for route '{routeId}'."));
             }
@@ -294,7 +298,7 @@ internal sealed class ConfigValidator : IConfigValidator
         {
             var dummyHttpContext = new DefaultHttpContext();
             var policy = await _corsPolicyProvider.GetPolicyAsync(dummyHttpContext, corsPolicyName);
-            if (policy != null)
+            if (policy is not null)
             {
                 errors.Add(new ArgumentException($"The application has registered a CORS policy named '{corsPolicyName}' that conflicts with the reserved CORS policy name used on this route. The registered policy name needs to be changed for this route to function."));
             }
@@ -305,7 +309,7 @@ internal sealed class ConfigValidator : IConfigValidator
         {
             var dummyHttpContext = new DefaultHttpContext();
             var policy = await _corsPolicyProvider.GetPolicyAsync(dummyHttpContext, corsPolicyName);
-            if (policy != null)
+            if (policy is not null)
             {
                 errors.Add(new ArgumentException($"The application has registered a CORS policy named '{corsPolicyName}' that conflicts with the reserved CORS policy name used on this route. The registered policy name needs to be changed for this route to function."));
             }
@@ -316,7 +320,7 @@ internal sealed class ConfigValidator : IConfigValidator
         {
             var dummyHttpContext = new DefaultHttpContext();
             var policy = await _corsPolicyProvider.GetPolicyAsync(dummyHttpContext, corsPolicyName);
-            if (policy == null)
+            if (policy is null)
             {
                 errors.Add(new ArgumentException($"CORS policy '{corsPolicyName}' not found for route '{routeId}'."));
             }
@@ -371,17 +375,17 @@ internal sealed class ConfigValidator : IConfigValidator
 
         var cookieConfig = cluster.SessionAffinity.Cookie;
 
-        if (cookieConfig == null)
+        if (cookieConfig is null)
         {
             return;
         }
 
-        if (cookieConfig.Expiration != null && cookieConfig.Expiration <= TimeSpan.Zero)
+        if (cookieConfig.Expiration is not null && cookieConfig.Expiration <= TimeSpan.Zero)
         {
             errors.Add(new ArgumentException($"Session affinity cookie expiration must be positive or null."));
         }
 
-        if (cookieConfig.MaxAge != null && cookieConfig.MaxAge <= TimeSpan.Zero)
+        if (cookieConfig.MaxAge is not null && cookieConfig.MaxAge <= TimeSpan.Zero)
         {
             errors.Add(new ArgumentException($"Session affinity cookie max-age must be positive or null."));
         }
@@ -389,19 +393,19 @@ internal sealed class ConfigValidator : IConfigValidator
 
     private static void ValidateProxyHttpClient(IList<Exception> errors, ClusterConfig cluster)
     {
-        if (cluster.HttpClient == null)
+        if (cluster.HttpClient is null)
         {
             // Proxy http client options are not set.
             return;
         }
 
-        if (cluster.HttpClient.MaxConnectionsPerServer != null && cluster.HttpClient.MaxConnectionsPerServer <= 0)
+        if (cluster.HttpClient.MaxConnectionsPerServer is not null && cluster.HttpClient.MaxConnectionsPerServer <= 0)
         {
             errors.Add(new ArgumentException($"Max connections per server limit set on the cluster '{cluster.ClusterId}' must be positive."));
         }
 #if NET
         var encoding = cluster.HttpClient.RequestHeaderEncoding;
-        if (encoding != null)
+        if (encoding is not null)
         {
             try
             {
@@ -415,20 +419,29 @@ internal sealed class ConfigValidator : IConfigValidator
 #endif
     }
 
-    private static void ValidateProxyHttpRequest(IList<Exception> errors, ClusterConfig cluster)
+    private void ValidateProxyHttpRequest(IList<Exception> errors, ClusterConfig cluster)
     {
-        if (cluster.HttpRequest == null)
+        if (cluster.HttpRequest is null)
         {
             // Proxy http request options are not set.
             return;
         }
 
-        if (cluster.HttpRequest.Version != null &&
+        if (cluster.HttpRequest.Version is not null &&
             cluster.HttpRequest.Version != HttpVersion.Version10 &&
             cluster.HttpRequest.Version != HttpVersion.Version11 &&
-            cluster.HttpRequest.Version != HttpVersion.Version20)
+            cluster.HttpRequest.Version != HttpVersion.Version20
+#if NET6_0_OR_GREATER
+            && cluster.HttpRequest.Version != HttpVersion.Version30
+#endif
+            )
         {
-            errors.Add(new ArgumentException($"Outgoing request version '{cluster.HttpRequest.Version}' is not any of supported HTTP versions (1.0, 1.1 and 2)."));
+            errors.Add(new ArgumentException($"Outgoing request version '{cluster.HttpRequest.Version}' is not any of supported HTTP versions (1.0, 1.1, 2 and 3)."));
+        }
+
+        if (cluster.HttpRequest.Version == HttpVersion.Version10)
+        {
+            Log.Http10Version(_logger);
         }
     }
 
@@ -470,12 +483,12 @@ internal sealed class ConfigValidator : IConfigValidator
             errors.Add(new ArgumentException($"No matching {nameof(IActiveHealthCheckPolicy)} found for the active health check policy name '{policy}' set on the cluster '{cluster.ClusterId}'."));
         }
 
-        if (activeOptions.Interval != null && activeOptions.Interval <= TimeSpan.Zero)
+        if (activeOptions.Interval is not null && activeOptions.Interval <= TimeSpan.Zero)
         {
             errors.Add(new ArgumentException($"Destination probing interval set on the cluster '{cluster.ClusterId}' must be positive."));
         }
 
-        if (activeOptions.Timeout != null && activeOptions.Timeout <= TimeSpan.Zero)
+        if (activeOptions.Timeout is not null && activeOptions.Timeout <= TimeSpan.Zero)
         {
             errors.Add(new ArgumentException($"Destination probing timeout set on the cluster '{cluster.ClusterId}' must be positive."));
         }
@@ -501,9 +514,22 @@ internal sealed class ConfigValidator : IConfigValidator
             errors.Add(new ArgumentException($"No matching {nameof(IPassiveHealthCheckPolicy)} found for the passive health check policy name '{policy}' set on the cluster '{cluster.ClusterId}'."));
         }
 
-        if (passiveOptions.ReactivationPeriod != null && passiveOptions.ReactivationPeriod <= TimeSpan.Zero)
+        if (passiveOptions.ReactivationPeriod is not null && passiveOptions.ReactivationPeriod <= TimeSpan.Zero)
         {
             errors.Add(new ArgumentException($"Unhealthy destination reactivation period set on the cluster '{cluster.ClusterId}' must be positive."));
+        }
+    }
+
+    private static class Log
+    {
+        private static readonly Action<ILogger, Exception?> _http10RequestVersionDetected = LoggerMessage.Define(
+            LogLevel.Warning,
+            EventIds.Http10RequestVersionDetected,
+            "The HttpRequest version is set to 1.0 which can result in poor performance and port exhaustion. Use 1.1, 2, or 3 instead.");
+
+        public static void Http10Version(ILogger logger)
+        {
+            _http10RequestVersionDetected(logger, null);
         }
     }
 }

@@ -411,7 +411,7 @@ public class ConfigValidatorTests
         {
             Name = name,
             Mode = mode,
-            Values = value == null ? null : new[] { value },
+            Values = value is null ? null : new[] { value },
         };
 
         var route = new RouteConfig
@@ -444,7 +444,7 @@ public class ConfigValidatorTests
         {
             Name = name,
             Mode = mode,
-            Values = value == null ? null : new[] { value },
+            Values = value is null ? null : new[] { value },
         };
 
         var route = new RouteConfig
@@ -845,7 +845,7 @@ public class ConfigValidatorTests
     [Theory]
     [InlineData(1, 9)]
     [InlineData(2, 5)]
-    [InlineData(3, 0)]
+    [InlineData(3, 1)]
     public async Task Rejects_RequestVersion(int major, int minor)
     {
         var version = new Version(major, minor);
@@ -864,7 +864,7 @@ public class ConfigValidatorTests
         var errors = await validator.ValidateClusterAsync(cluster);
 
         Assert.Equal(1, errors.Count);
-        Assert.Equal($"Outgoing request version '{cluster.HttpRequest.Version}' is not any of supported HTTP versions (1.0, 1.1 and 2).", errors[0].Message);
+        Assert.Equal($"Outgoing request version '{cluster.HttpRequest.Version}' is not any of supported HTTP versions (1.0, 1.1, 2 and 3).", errors[0].Message);
         Assert.IsType<ArgumentException>(errors[0]);
     }
 
@@ -888,10 +888,10 @@ public class ConfigValidatorTests
                 Active = new ActiveHealthCheckConfig
                 {
                     Enabled = true,
-                    Interval = interval != null ? TimeSpan.FromSeconds(interval.Value) : (TimeSpan?)null,
+                    Interval = interval is not null ? TimeSpan.FromSeconds(interval.Value) : (TimeSpan?)null,
                     Path = path,
                     Policy = policy,
-                    Timeout = timeout != null ? TimeSpan.FromSeconds(timeout.Value) : (TimeSpan?)null
+                    Timeout = timeout is not null ? TimeSpan.FromSeconds(timeout.Value) : (TimeSpan?)null
                 }
             }
         };
@@ -918,9 +918,9 @@ public class ConfigValidatorTests
                 Active = new ActiveHealthCheckConfig
                 {
                     Enabled = true,
-                    Interval = interval != null ? TimeSpan.FromSeconds(interval.Value) : (TimeSpan?)null,
+                    Interval = interval is not null ? TimeSpan.FromSeconds(interval.Value) : (TimeSpan?)null,
                     Policy = policy,
-                    Timeout = timeout != null ? TimeSpan.FromSeconds(timeout.Value) : (TimeSpan?)null
+                    Timeout = timeout is not null ? TimeSpan.FromSeconds(timeout.Value) : (TimeSpan?)null
                 }
             }
         };
@@ -951,7 +951,7 @@ public class ConfigValidatorTests
                 {
                     Enabled = true,
                     Policy = policy,
-                    ReactivationPeriod = reactivationPeriod != null ? TimeSpan.FromSeconds(reactivationPeriod.Value) : (TimeSpan?)null
+                    ReactivationPeriod = reactivationPeriod is not null ? TimeSpan.FromSeconds(reactivationPeriod.Value) : (TimeSpan?)null
                 }
             }
         };
@@ -978,7 +978,7 @@ public class ConfigValidatorTests
                 {
                     Enabled = true,
                     Policy = policy,
-                    ReactivationPeriod = reactivationPeriod != null ? TimeSpan.FromSeconds(reactivationPeriod.Value) : (TimeSpan?)null
+                    ReactivationPeriod = reactivationPeriod is not null ? TimeSpan.FromSeconds(reactivationPeriod.Value) : (TimeSpan?)null
                 }
             }
         };

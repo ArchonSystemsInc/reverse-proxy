@@ -109,11 +109,11 @@ internal sealed class HttpForwarder : IHttpForwarder
         var activityCancellationSource = ActivityCancellationTokenSource.Rent(requestConfig?.ActivityTimeout ?? DefaultTimeout, context.RequestAborted);
         try
         {
-            var isClientHttp2 = ProtocolHelper.IsHttp2(context.Request.Protocol);
+            var isClientHttp2OrGreater = ProtocolHelper.IsHttp2OrGreater(context.Request.Protocol);
 
             // NOTE: We heuristically assume gRPC-looking requests may require streaming semantics.
             // See https://github.com/microsoft/reverse-proxy/issues/118 for design discussion.
-            var isStreamingRequest = isClientHttp2 && ProtocolHelper.IsGrpcContentType(context.Request.ContentType);
+            var isStreamingRequest = isClientHttp2OrGreater && ProtocolHelper.IsGrpcContentType(context.Request.ContentType);
 
             // :: Step 1-3: Create outgoing HttpRequestMessage
             var (destinationRequest, requestContent) = await CreateRequestMessageAsync(
@@ -135,12 +135,7 @@ internal sealed class HttpForwarder : IHttpForwarder
                 return await HandleRequestFailureAsync(context, requestContent, requestException, transformer, activityCancellationSource);
             }
 
-            // Detect connection downgrade, which may be problematic for e.g. gRPC.
-            if (isClientHttp2 && destinationResponse.Version.Major != 2)
-            {
-                // TODO: Do something on connection downgrade...
-                Log.HttpDowngradeDetected(_logger);
-            }
+            Log.ResponseReceived(_logger, destinationResponse);
 
             try
             {
@@ -257,7 +252,7 @@ internal sealed class HttpForwarder : IHttpForwarder
         HttpTransformer transformer, ForwarderRequestConfig? requestConfig, bool isStreamingRequest, ActivityCancellationTokenSource activityToken)
     {
         // "http://a".Length = 8
-        if (destinationPrefix == null || destinationPrefix.Length < 8)
+        if (destinationPrefix is null || destinationPrefix.Length < 8)
         {
             throw new ArgumentException("Invalid destination prefix.", nameof(destinationPrefix));
         }
@@ -325,7 +320,7 @@ internal sealed class HttpForwarder : IHttpForwarder
             }
         }
 
-        if (connectionUpgradeValue != null && context.Request.Headers.TryGetValue(HeaderNames.Upgrade, out var upgradeValue))
+        if (connectionUpgradeValue is not null && context.Request.Headers.TryGetValue(HeaderNames.Upgrade, out var upgradeValue))
         {
             request.Headers.TryAddWithoutValidation(HeaderNames.Connection, connectionUpgradeValue);
             request.Headers.TryAddWithoutValidation(HeaderNames.Upgrade, (IEnumerable<string>)upgradeValue);
@@ -344,7 +339,7 @@ internal sealed class HttpForwarder : IHttpForwarder
 
 #if NET
         var canHaveBodyFeature = request.HttpContext.Features.Get<IHttpRequestBodyDetectionFeature>();
-        if (canHaveBodyFeature != null)
+        if (canHaveBodyFeature is not null)
         {
             // 5.0 servers provide a definitive answer for us.
             hasBody = canHaveBodyFeature.CanHaveBody;
@@ -461,13 +456,18 @@ internal sealed class HttpForwarder : IHttpForwarder
     {
         if (requestException is OperationCanceledException)
         {
-            if (!context.RequestAborted.IsCancellationRequested && requestCancellationSource.IsCancellationRequested)
+            if (context.RequestAborted.IsCancellationRequested)
             {
-                return await ReportErrorAsync(ForwarderError.RequestTimedOut, StatusCodes.Status504GatewayTimeout);
+                return await ReportErrorAsync(ForwarderError.RequestCanceled, StatusCodes.Status502BadGateway);
             }
             else
             {
-                return await ReportErrorAsync(ForwarderError.RequestCanceled, StatusCodes.Status502BadGateway);
+#if NET6_0_OR_GREATER
+                Debug.Assert(requestCancellationSource.IsCancellationRequested || requestException.ToString().Contains("ConnectTimeout"), requestException.ToString());
+#else
+                Debug.Assert(requestCancellationSource.IsCancellationRequested || requestException.ToString().Contains("ConnectHelper"), requestException.ToString());
+#endif
+                return await ReportErrorAsync(ForwarderError.RequestTimedOut, StatusCodes.Status504GatewayTimeout);
             }
         }
 
@@ -548,14 +548,14 @@ internal sealed class HttpForwarder : IHttpForwarder
         // SocketHttpHandler and similar transports always provide an HttpContent object, even if it's empty.
         // Note as of 5.0 HttpResponse.Content never returns null.
         // https://github.com/dotnet/runtime/blame/8fc68f626a11d646109a758cb0fc70a0aa7826f1/src/libraries/System.Net.Http/src/System/Net/Http/HttpResponseMessage.cs#L46
-        if (destinationResponse.Content == null)
+        if (destinationResponse.Content is null)
         {
             throw new InvalidOperationException("A response content is required for upgrades.");
         }
 
         // :: Step 7-A-1: Upgrade the client channel. This will also send response headers.
         var upgradeFeature = context.Features.Get<IHttpUpgradeFeature>();
-        if (upgradeFeature == null)
+        if (upgradeFeature is null)
         {
             var ex = new InvalidOperationException("Invalid 101 response when upgrades aren't supported.");
             destinationResponse.Dispose();
@@ -637,7 +637,7 @@ internal sealed class HttpForwarder : IHttpForwarder
         // In 3.1 this is only likely to return null in tests.
         // As of 5.0 HttpResponse.Content never returns null.
         // https://github.com/dotnet/runtime/blame/8fc68f626a11d646109a758cb0fc70a0aa7826f1/src/libraries/System.Net.Http/src/System/Net/Http/HttpResponseMessage.cs#L46
-        if (destinationResponseContent != null)
+        if (destinationResponseContent is not null)
         {
             using var destinationResponseStream = await destinationResponseContent.ReadAsStreamAsync();
             // The response content-length is enforced by the server.
@@ -711,13 +711,13 @@ internal sealed class HttpForwarder : IHttpForwarder
     private void DisableMinRequestBodyDataRateAndMaxRequestBodySize(HttpContext httpContext)
     {
         var minRequestBodyDataRateFeature = httpContext.Features.Get<IHttpMinRequestBodyDataRateFeature>();
-        if (minRequestBodyDataRateFeature != null)
+        if (minRequestBodyDataRateFeature is not null)
         {
             minRequestBodyDataRateFeature.MinDataRate = null;
         }
 
         var maxRequestBodySizeFeature = httpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
-        if (maxRequestBodySizeFeature != null)
+        if (maxRequestBodySizeFeature is not null)
         {
             if (!maxRequestBodySizeFeature.IsReadOnly)
             {
@@ -742,7 +742,7 @@ internal sealed class HttpForwarder : IHttpForwarder
     private static void ResetOrAbort(HttpContext context, bool isCancelled)
     {
         var resetFeature = context.Features.Get<IHttpResetFeature>();
-        if (resetFeature != null)
+        if (resetFeature is not null)
         {
             // https://tools.ietf.org/html/rfc7540#section-7
             const int Cancelled = 2;
@@ -756,10 +756,10 @@ internal sealed class HttpForwarder : IHttpForwarder
 
     private static class Log
     {
-        private static readonly Action<ILogger, Exception?> _httpDowngradeDetected = LoggerMessage.Define(
-            LogLevel.Debug,
-            EventIds.HttpDowngradeDetected,
-            "The request was downgraded from HTTP/2.");
+        private static readonly Action<ILogger, Version, int, Exception?> _responseReceived = LoggerMessage.Define<Version, int>(
+            LogLevel.Information,
+            EventIds.ResponseReceived,
+            "Received HTTP/{version} response {statusCode}.");
 
         private static readonly Action<ILogger, string, string, string, string, Exception?> _proxying = LoggerMessage.Define<string, string, string, string>(
             LogLevel.Information,
@@ -771,9 +771,9 @@ internal sealed class HttpForwarder : IHttpForwarder
             EventIds.ForwardingError,
             "{error}: {message}");
 
-        public static void HttpDowngradeDetected(ILogger logger)
+        public static void ResponseReceived(ILogger logger, HttpResponseMessage msg)
         {
-            _httpDowngradeDetected(logger, null);
+            _responseReceived(logger, msg.Version, (int)msg.StatusCode, null);
         }
 
         public static void Proxying(ILogger logger, HttpRequestMessage msg, bool isStreamingRequest)

@@ -6,6 +6,8 @@
   href: config-files.md
 - name: Configuration Providers
   href: config-providers.md
+- name: Configuration Filters
+  href: config-filters.md
 - name: Direct Forwarding
   href: direct-forwarding.md
 - name: HTTP client configuration
@@ -34,6 +36,8 @@
   href: distributed-tracing.md
 - name: gRPC
   href: grpc.md
+- name: WebSockets and SPDY
+  href: websockets.md
 - name: Service Fabric Integration
   href: service-fabric-int.md
 - name: Http.sys Delegation
@@ -44,3 +48,7 @@
   href: diagnosing-yarp-issues.md
 - name: A/B Testing
   href: ab-testing.md
+- name: HTTP/3
+  href: http3.md
+- name: Lets Encrypt
+  href: lets-encrypt.md

@@ -10,7 +10,7 @@ using Xunit;
 using Yarp.Kubernetes.Controller;
 using Yarp.Kubernetes.Controller.Caching;
 
-namespace IngressController.Tests;
+namespace Yarp.Kubernetes.Tests;
 
 public class IngressCacheTests
 {
@@ -36,7 +36,7 @@ public class IngressCacheTests
     public void IngressWithClassAnnotationTests(string ingressClassName, string controllerName, bool? isDefault, int expectedIngressCount)
     {
         // Arrange
-        if (controllerName != null)
+        if (controllerName is not null)
         {
             var ingressClass = KubeResourceGenerator.CreateIngressClass(ingressClassName, controllerName, isDefault);
             _cacheUnderTest.Update(WatchEventType.Added, ingressClass);
@@ -64,7 +64,7 @@ public class IngressCacheTests
     public void IngressWithoutClassAnnotationTests(string ingressClassName, string controllerName, bool? isDefault, int expectedIngressCount)
     {
         // Arrange
-        if (controllerName != null)
+        if (controllerName is not null)
         {
             var ingressClass = KubeResourceGenerator.CreateIngressClass(ingressClassName, controllerName, isDefault);
             _cacheUnderTest.Update(WatchEventType.Added, ingressClass);

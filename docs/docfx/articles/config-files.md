@@ -35,20 +35,22 @@ public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
 ```
 **Note**: For details about middleware ordering see [here](https://docs.microsoft.com/aspnet/core/fundamentals/middleware/#middleware-order).
 
+Configuration can be modified during the load sequence using [Configuration Filters](config-filters.md).
+
 ## Multiple Configuration Sources
 As of 1.1, YARP supports loading the proxy configuration from multiple sources. LoadFromConfig may be called multiple times referencing different IConfiguration sections or may be combine with a different config source like InMemory. Routes can reference clusters from other sources. Note merging partial config from different sources for a given route or cluster is not supported.
 
-```
-    services.AddReverseProxy()
-        .LoadFromConfig(Configuration.GetSection("ReverseProxy1"))
-        .LoadFromConfig(Configuration.GetSection("ReverseProxy2"));
+```c#
+services.AddReverseProxy()
+    .LoadFromConfig(Configuration.GetSection("ReverseProxy1"))
+    .LoadFromConfig(Configuration.GetSection("ReverseProxy2"));
 ```
 or
-```
+```c#
 
-    services.AddReverseProxy()
-        .LoadFromMemory(routes, clusters)
-        .LoadFromConfig(Configuration.GetSection("ReverseProxy"));
+services.AddReverseProxy()
+    .LoadFromMemory(routes, clusters)
+    .LoadFromConfig(Configuration.GetSection("ReverseProxy"));
 ```
 
 ## Configuration contract

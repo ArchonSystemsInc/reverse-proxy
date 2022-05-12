@@ -26,7 +26,7 @@ using Yarp.Kubernetes.Controller.Converters;
 using Yarp.Kubernetes.Controller.Services;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace IngressController.Tests;
+namespace Yarp.Kubernetes.Tests;
 
 public class IngressControllerTests
 {
@@ -129,7 +129,7 @@ public class IngressControllerTests
         typeMap.Add("v1/Service", typeof(V1Service));
         typeMap.Add("v1/Endpoints", typeof(V1Endpoints));
 
-        if (ingressClass != null)
+        if (ingressClass is not null)
         {
             cache.Update(WatchEventType.Added, ingressClass);
         }
