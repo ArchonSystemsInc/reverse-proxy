@@ -199,15 +199,15 @@ internal sealed class ConfigValidator : IConfigValidator
                 errors.Add(new ArgumentException($"A null or empty route header name has been set for route '{routeId}'."));
             }
 
-            if (header.Mode != HeaderMatchMode.Exists
+            if ((header.Mode != HeaderMatchMode.Exists && header.Mode != HeaderMatchMode.NotExists)
                 && (header.Values is null || header.Values.Count == 0))
             {
                 errors.Add(new ArgumentException($"No header values were set on route header '{header.Name}' for route '{routeId}'."));
             }
 
-            if (header.Mode == HeaderMatchMode.Exists && header.Values?.Count > 0)
+            if ((header.Mode == HeaderMatchMode.Exists || header.Mode == HeaderMatchMode.NotExists) && header.Values?.Count > 0)
             {
-                errors.Add(new ArgumentException($"Header values where set when using mode '{nameof(HeaderMatchMode.Exists)}' on route header '{header.Name}' for route '{routeId}'."));
+                errors.Add(new ArgumentException($"Header values were set when using mode '{header.Mode}' on route header '{header.Name}' for route '{routeId}'."));
             }
         }
     }
@@ -403,7 +403,7 @@ internal sealed class ConfigValidator : IConfigValidator
         {
             errors.Add(new ArgumentException($"Max connections per server limit set on the cluster '{cluster.ClusterId}' must be positive."));
         }
-#if NET
+
         var encoding = cluster.HttpClient.RequestHeaderEncoding;
         if (encoding is not null)
         {
@@ -416,7 +416,6 @@ internal sealed class ConfigValidator : IConfigValidator
                 errors.Add(new ArgumentException($"Invalid header encoding '{encoding}'.", aex));
             }
         }
-#endif
     }
 
     private void ValidateProxyHttpRequest(IList<Exception> errors, ClusterConfig cluster)
@@ -430,11 +429,8 @@ internal sealed class ConfigValidator : IConfigValidator
         if (cluster.HttpRequest.Version is not null &&
             cluster.HttpRequest.Version != HttpVersion.Version10 &&
             cluster.HttpRequest.Version != HttpVersion.Version11 &&
-            cluster.HttpRequest.Version != HttpVersion.Version20
-#if NET6_0_OR_GREATER
-            && cluster.HttpRequest.Version != HttpVersion.Version30
-#endif
-            )
+            cluster.HttpRequest.Version != HttpVersion.Version20 &&
+            cluster.HttpRequest.Version != HttpVersion.Version30)
         {
             errors.Add(new ArgumentException($"Outgoing request version '{cluster.HttpRequest.Version}' is not any of supported HTTP versions (1.0, 1.1, 2 and 3)."));
         }

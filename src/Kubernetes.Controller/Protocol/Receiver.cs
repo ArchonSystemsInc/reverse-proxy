@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Kubernetes.Controller.Hosting;
-using Microsoft.Kubernetes.Controller.Rate;
 using Yarp.Kubernetes.Controller.Configuration;
+using Yarp.Kubernetes.Controller.Hosting;
+using Yarp.Kubernetes.Controller.Rate;
 
 namespace Yarp.Kubernetes.Protocol;
 
@@ -53,11 +53,7 @@ public class Receiver : BackgroundHostedService
 
             try
             {
-#if NET
                 using var stream = await client.GetStreamAsync(_options.ControllerUrl, cancellationToken).ConfigureAwait(false);
-#else
-                using var stream = await client.GetStreamAsync(_options.ControllerUrl).ConfigureAwait(false);
-#endif
                 using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
                 using var cancellation = cancellationToken.Register(stream.Close);
                 while (true)
@@ -84,7 +80,7 @@ public class Receiver : BackgroundHostedService
             catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
             {
-                Logger.LogInformation("Stream ended: {Message}", ex.Message);
+                Logger.LogInformation(ex, "Stream ended");
             }
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }

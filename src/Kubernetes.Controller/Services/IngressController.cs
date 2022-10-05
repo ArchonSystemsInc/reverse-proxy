@@ -2,16 +2,18 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Kubernetes.Controller.Hosting;
-using Microsoft.Kubernetes.Controller.Informers;
-using Microsoft.Kubernetes.Controller.Queues;
+using Microsoft.Extensions.Options;
 using Yarp.Kubernetes.Controller.Caching;
+using Yarp.Kubernetes.Controller.Client;
+using Yarp.Kubernetes.Controller.Hosting;
+using Yarp.Kubernetes.Controller.Queues;
 
 namespace Yarp.Kubernetes.Controller.Services;
 
@@ -23,7 +25,7 @@ namespace Yarp.Kubernetes.Controller.Services;
 /// </summary>
 public class IngressController : BackgroundHostedService
 {
-    private readonly IResourceInformerRegistration[] _registrations;
+    private readonly IReadOnlyList<IResourceInformerRegistration> _registrations;
     private readonly ICache _cache;
     private readonly IReconciler _reconciler;
 
@@ -38,41 +40,22 @@ public class IngressController : BackgroundHostedService
         IResourceInformer<V1Service> serviceInformer,
         IResourceInformer<V1Endpoints> endpointsInformer,
         IResourceInformer<V1IngressClass> ingressClassInformer,
+        IResourceInformer<V1Secret> secretInformer,
         IHostApplicationLifetime hostApplicationLifetime,
+        IOptions<YarpOptions> options,
         ILogger<IngressController> logger)
         : base(hostApplicationLifetime, logger)
     {
-        if (ingressInformer is null)
-        {
-            throw new ArgumentNullException(nameof(ingressInformer));
-        }
+        ArgumentNullException.ThrowIfNull(ingressInformer, nameof(ingressInformer));
+        ArgumentNullException.ThrowIfNull(serviceInformer, nameof(serviceInformer));
+        ArgumentNullException.ThrowIfNull(endpointsInformer, nameof(endpointsInformer));
+        ArgumentNullException.ThrowIfNull(ingressClassInformer, nameof(ingressClassInformer));
+        ArgumentNullException.ThrowIfNull(secretInformer, nameof(secretInformer));
+        ArgumentNullException.ThrowIfNull(options, nameof(options));
 
-        if (serviceInformer is null)
-        {
-            throw new ArgumentNullException(nameof(serviceInformer));
-        }
+        var watchSecrets = options.Value.ServerCertificates;
 
-        if (endpointsInformer is null)
-        {
-            throw new ArgumentNullException(nameof(endpointsInformer));
-        }
-
-        if (ingressClassInformer is null)
-        {
-            throw new ArgumentNullException(nameof(ingressClassInformer));
-        }
-
-        if (hostApplicationLifetime is null)
-        {
-            throw new ArgumentNullException(nameof(hostApplicationLifetime));
-        }
-
-        if (logger is null)
-        {
-            throw new ArgumentNullException(nameof(logger));
-        }
-
-        _registrations = new[]
+        var registrations = new List<IResourceInformerRegistration>()
         {
             serviceInformer.Register(Notification),
             endpointsInformer.Register(Notification),
@@ -80,11 +63,23 @@ public class IngressController : BackgroundHostedService
             ingressInformer.Register(Notification)
         };
 
+        if (watchSecrets)
+        {
+            registrations.Add(secretInformer.Register(Notification));
+        }
+
+        _registrations = registrations;
+
         _registrationsReady = false;
         serviceInformer.StartWatching();
         endpointsInformer.StartWatching();
         ingressClassInformer.StartWatching();
         ingressInformer.StartWatching();
+
+        if (watchSecrets)
+        {
+            secretInformer.StartWatching();
+        }
 
         _queue = new ProcessingRateLimitedQueue<QueueItem>(perSecond: 0.5, burst: 1);
 
@@ -175,6 +170,16 @@ public class IngressController : BackgroundHostedService
     }
 
     /// <summary>
+    /// Called by the informer with real-time resource updates.
+    /// </summary>
+    /// <param name="eventType">Indicates if the resource new, updated, or deleted.</param>
+    /// <param name="resource">The information as provided by the Kubernetes API server.</param>
+    private void Notification(WatchEventType eventType, V1Secret resource)
+    {
+        _cache.Update(eventType, resource);
+    }
+
+    /// <summary>
     /// Called once at startup by the hosting infrastructure. This function must remain running
     /// for the entire lifetime of an application.
     /// </summary>
@@ -200,28 +205,27 @@ public class IngressController : BackgroundHostedService
             var (item, shutdown) = await _queue.GetAsync(cancellationToken).ConfigureAwait(false);
             if (shutdown)
             {
+                Logger.LogInformation("Work queue has been shutdown. Exiting reconciliation loop.");
                 return;
             }
 
             try
             {
                 await _reconciler.ProcessAsync(cancellationToken).ConfigureAwait(false);
-
-                // calling Done after GetAsync informs the queue
-                // that the item is no longer being actively processed
-                _queue.Done(item);
             }
-#pragma warning disable CA1031 // Do not catch general exception types
             catch
-#pragma warning restore CA1031 // Do not catch general exception types
             {
-#pragma warning disable CA1303 // Do not pass literals as localized parameters
                 Logger.LogInformation("Rescheduling {Change}", item.Change);
-#pragma warning restore CA1303 // Do not pass literals as localized parameters
 
                 // Any failure to process this item results in being re-queued
                 _queue.Add(item);
             }
+            finally
+            {
+                _queue.Done(item);
+            }
         }
+
+        Logger.LogInformation("Reconciliation loop cancelled");
     }
 }
