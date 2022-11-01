@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using k8s.Models;
 using YamlDotNet.Serialization;
@@ -96,7 +97,8 @@ internal static class YarpParser
                     Match = new RouteMatch()
                     {
                         Hosts = host is not null ? new[] { host } : Array.Empty<string>(),
-                        Path = pathMatch
+                        Path = pathMatch,
+                        Headers = ingressContext.Options.RouteHeaders
                     },
                     ClusterId = cluster.ClusterId,
                     RouteId = $"{ingressContext.Ingress.Metadata.Name}.{ingressContext.Ingress.Metadata.NamespaceProperty}:{path.Path}",
@@ -104,6 +106,7 @@ internal static class YarpParser
                     AuthorizationPolicy = ingressContext.Options.AuthorizationPolicy,
                     CorsPolicy = ingressContext.Options.CorsPolicy,
                     Metadata = ingressContext.Options.RouteMetadata,
+                    Order = ingressContext.Options.RouteOrder,
                 });
 
                 // Add destination for every endpoint address
@@ -202,7 +205,15 @@ internal static class YarpParser
         {
             options.RouteMetadata = YamlDeserializer.Deserialize<Dictionary<string, string>>(routeMetadata);
         }
-
+        if (annotations.TryGetValue("yarp.ingress.kubernetes.io/route-headers", out var routeHeaders))
+        {
+            // YamlDeserializer does not support IReadOnlyList<string> in RouteHeader for now, so we use RouteHeaderWapper to solve this problem.
+            options.RouteHeaders = YamlDeserializer.Deserialize<List<RouteHeaderWapper>>(routeHeaders).Select(p => p.ToRouteHeader()).ToList();
+        }
+        if (annotations.TryGetValue("yarp.ingress.kubernetes.io/route-order", out var routeOrder))
+        {
+            options.RouteOrder = int.Parse(routeOrder, CultureInfo.InvariantCulture);
+        }
         // metadata to support:
         // rewrite target
         // auth
