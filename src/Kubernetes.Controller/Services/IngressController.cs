@@ -27,6 +27,10 @@ namespace Yarp.Kubernetes.Controller.Services;
 public class IngressController : BackgroundHostedService
 {
     private readonly IResourceInformerRegistration[] _registrations;
+    private readonly IResourceInformer<V1Ingress> _ingressInformer;
+    private readonly IResourceInformer<V1Service> _serviceInformer;
+    private readonly IResourceInformer<V1Endpoints> _endpointsInformer;
+    private readonly IResourceInformer<V1IngressClass> _ingressClassInformer;
     private readonly ICache _cache;
     private readonly IReconciler _reconciler;
 
@@ -45,26 +49,6 @@ public class IngressController : BackgroundHostedService
         ILogger<IngressController> logger)
         : base(hostApplicationLifetime, logger)
     {
-        if (ingressInformer is null)
-        {
-            throw new ArgumentNullException(nameof(ingressInformer));
-        }
-
-        if (serviceInformer is null)
-        {
-            throw new ArgumentNullException(nameof(serviceInformer));
-        }
-
-        if (endpointsInformer is null)
-        {
-            throw new ArgumentNullException(nameof(endpointsInformer));
-        }
-
-        if (ingressClassInformer is null)
-        {
-            throw new ArgumentNullException(nameof(ingressClassInformer));
-        }
-
         if (hostApplicationLifetime is null)
         {
             throw new ArgumentNullException(nameof(hostApplicationLifetime));
@@ -75,19 +59,21 @@ public class IngressController : BackgroundHostedService
             throw new ArgumentNullException(nameof(logger));
         }
 
+        _ingressInformer = ingressInformer ?? throw new ArgumentNullException(nameof(ingressInformer));
+        _serviceInformer = serviceInformer ?? throw new ArgumentNullException(nameof(serviceInformer));
+        _endpointsInformer = endpointsInformer ?? throw new ArgumentNullException(nameof(endpointsInformer));
+        _ingressClassInformer = ingressClassInformer ?? throw new ArgumentNullException(nameof(ingressClassInformer));
+
         _registrations = new[]
         {
-            serviceInformer.Register(Notification),
-            endpointsInformer.Register(Notification),
-            ingressClassInformer.Register(Notification),
-            ingressInformer.Register(Notification)
+            _ingressInformer.Register(Notification),
+            _serviceInformer.Register(Notification),
+            _endpointsInformer.Register(Notification),
+            _ingressClassInformer.Register(Notification)
         };
 
         _registrationsReady = false;
-        serviceInformer.StartWatching();
-        endpointsInformer.StartWatching();
         ingressClassInformer.StartWatching();
-        ingressInformer.StartWatching();
 
         _queue = new ProcessingRateLimitedQueue<QueueItem>(perSecond: 0.5, burst: 1);
 
@@ -203,6 +189,13 @@ public class IngressController : BackgroundHostedService
     /// <returns>The Task representing the async function results.</returns>
     public override async Task RunAsync(CancellationToken cancellationToken)
     {
+        // Wait for ingress classes to be loaded first before processing anything else
+        await _ingressClassInformer.ReadyAsync(cancellationToken).ConfigureAwait(false);
+
+        _ingressInformer.StartWatching();
+        _serviceInformer.StartWatching();
+        _endpointsInformer.StartWatching();
+
         // First wait for all informers to fully List resources before processing begins.
         foreach (var registration in _registrations)
         {
