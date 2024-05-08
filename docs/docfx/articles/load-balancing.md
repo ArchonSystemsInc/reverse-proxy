@@ -23,19 +23,19 @@ If no policy is specified, `PowerOfTwoChoices` will be used.
 
 ```JSON
 "ReverseProxy": {
-    "Clusters": {
-        "cluster1": {
-            "LoadBalancingPolicy": "RoundRobin",
-            "Destinations": {
-                "cluster1/destination1": {
-                    "Address": "https://localhost:10000/"
-                },
-                "cluster1/destination2": {
-                    "Address": "https://localhost:10010/"
-                }
-            }
+  "Clusters": {
+    "cluster1": {
+      "LoadBalancingPolicy": "RoundRobin",
+      "Destinations": {
+        "cluster1/destination1": {
+          "Address": "https://localhost:10000/"
+        },
+        "cluster1/destination2": {
+          "Address": "https://localhost:10010/"
         }
+      }
     }
+  }
 }
 ```
 
@@ -48,7 +48,7 @@ var clusters = new[]
     {
         ClusterId = "cluster1",
         LoadBalancingPolicy = LoadBalancingPolicies.RoundRobin,
-        Destinations = new Dictionary<string, Destination>(StringComparer.OrdinalIgnoreCase)
+        Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
         {
             { "destination1", new DestinationConfig() { Address = "https://localhost:10000" } },
             { "destination2", new DestinationConfig() { Address = "https://localhost:10010" } }

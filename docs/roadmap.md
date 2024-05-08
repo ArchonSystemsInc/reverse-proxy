@@ -1,13 +1,27 @@
 # YARP Roadmap
 
-## Current status
+### Supported YARP versions
 
-YARP 1.1 has [released](https://github.com/microsoft/reverse-proxy/releases/tag/v1.1.0).
+[Latest releases](https://github.com/microsoft/reverse-proxy/releases)
+
+| Version | Release Date | Latest Patch Version | End of Support |
+| -- | -- | -- | -- |
+| [YARP 2.1](https://github.com/microsoft/reverse-proxy/releases/tag/v2.1.0) | November 17, 2023 | [2.1.0](https://github.com/microsoft/reverse-proxy/releases/tag/v2.1.0) |  |
+| [YARP 2.0](https://github.com/microsoft/reverse-proxy/releases/tag/v2.0.0) | February 2, 2023 | [2.0.1](https://github.com/microsoft/reverse-proxy/releases/tag/v2.0.1) | May 17, 2024 |
+
+### End-of-life YARP versions
+
+| Version | Released date | Final Patch Version | End of support |
+| -- | -- | -- | -- |
+| [YARP 1.1](https://github.com/microsoft/reverse-proxy/releases/tag/v1.1.0) | May 2, 2022 | [1.1.2](https://github.com/microsoft/reverse-proxy/releases/tag/v1.1.2) | August 14, 2023 |
+| [YARP 1.0](https://github.com/microsoft/reverse-proxy/releases/tag/v1.0.0) | November 9, 2021 | [1.0.1](https://github.com/microsoft/reverse-proxy/releases/tag/v1.0.1) | November 2, 2022 |
+
+## Current status
 
 We are planning our next steps, we think the outline will probably look something like:
 
-- 1.1.x - Servicing high impact issues found by customers deploying 1.1 (bug fixes, small features)
-- 2.0+ - Major features eg Kubernetes
+- 2.x - High pri customer asks
+- Ongoing - Major features eg Kubernetes
 
 The cadence for these will depend on the issues reported by customers.
 
@@ -19,8 +33,8 @@ The support period for YARP releases is as follows:
 
 | Release	| Issue Type | Support period |
 | --- | ---| --- |
-| 1.x	| Security Bugs, Major behavior defects	| Until next 1.x GA + 6 Months |
-| | Minor behavior defects	| Until next 1.x GA |
+| Major or minor version | Security Bugs, Major behavior defects	| Until next GA + 6 Months |
+| Patch version | Minor behavior defects	| Until next GA |
 | Preview | Security Bugs, Major behavior defects | Until next preview |
 | | All other | None - may be addressed by next preview |
 

@@ -147,6 +147,14 @@ internal sealed class ConfigurationConfigProvider : IProxyConfigProvider, IDispo
             MaxRequestBodySize = section.ReadInt64(nameof(RouteConfig.MaxRequestBodySize)),
             ClusterId = section[nameof(RouteConfig.ClusterId)],
             AuthorizationPolicy = section[nameof(RouteConfig.AuthorizationPolicy)],
+#if NET7_0_OR_GREATER
+            RateLimiterPolicy = section[nameof(RouteConfig.RateLimiterPolicy)],
+            OutputCachePolicy = section[nameof(RouteConfig.OutputCachePolicy)],
+#endif
+#if NET8_0_OR_GREATER
+            TimeoutPolicy = section[nameof(RouteConfig.TimeoutPolicy)],
+            Timeout = section.ReadTimeSpan(nameof(RouteConfig.Timeout)),
+#endif
             CorsPolicy = section[nameof(RouteConfig.CorsPolicy)],
             Metadata = section.GetSection(nameof(RouteConfig.Metadata)).ReadStringDictionary(),
             Transforms = CreateTransforms(section.GetSection(nameof(RouteConfig.Transforms))),
@@ -304,7 +312,8 @@ internal sealed class ConfigurationConfigProvider : IProxyConfigProvider, IDispo
             Interval = section.ReadTimeSpan(nameof(ActiveHealthCheckConfig.Interval)),
             Timeout = section.ReadTimeSpan(nameof(ActiveHealthCheckConfig.Timeout)),
             Policy = section[nameof(ActiveHealthCheckConfig.Policy)],
-            Path = section[nameof(ActiveHealthCheckConfig.Path)]
+            Path = section[nameof(ActiveHealthCheckConfig.Path)],
+            Query = section[nameof(ActiveHealthCheckConfig.Query)]
         };
     }
 
@@ -347,6 +356,7 @@ internal sealed class ConfigurationConfigProvider : IProxyConfigProvider, IDispo
             MaxConnectionsPerServer = section.ReadInt32(nameof(HttpClientConfig.MaxConnectionsPerServer)),
             EnableMultipleHttp2Connections = section.ReadBool(nameof(HttpClientConfig.EnableMultipleHttp2Connections)),
             RequestHeaderEncoding = section[nameof(HttpClientConfig.RequestHeaderEncoding)],
+            ResponseHeaderEncoding = section[nameof(HttpClientConfig.ResponseHeaderEncoding)],
             WebProxy = webProxy
         };
     }
@@ -374,6 +384,7 @@ internal sealed class ConfigurationConfigProvider : IProxyConfigProvider, IDispo
             Address = section[nameof(DestinationConfig.Address)]!,
             Health = section[nameof(DestinationConfig.Health)],
             Metadata = section.GetSection(nameof(DestinationConfig.Metadata)).ReadStringDictionary(),
+            Host = section[nameof(DestinationConfig.Host)]
         };
     }
 

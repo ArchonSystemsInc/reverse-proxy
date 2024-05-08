@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Threading.Tasks;
 using Yarp.Kubernetes.Controller.Caching;
+using System.Threading;
 
 namespace Yarp.Kubernetes.Controller.Client;
 
@@ -31,19 +32,25 @@ internal sealed class V1IngressResourceStatusUpdater : IIngressResourceStatusUpd
     }
 
 
-    public async Task UpdateStatusAsync()
+    public async Task UpdateStatusAsync(CancellationToken cancellationToken)
     {
-        var service = _client.CoreV1.ReadNamespacedServiceStatus(_options.ControllerServiceName, _options.ControllerServiceNamespace);
+        var service = await _client.CoreV1.ReadNamespacedServiceStatusAsync(_options.ControllerServiceName, _options.ControllerServiceNamespace, cancellationToken: cancellationToken);
         if (service.Status?.LoadBalancer?.Ingress is { } loadBalancerIngresses)
         {
-            var status = new V1IngressStatus(new V1LoadBalancerStatus(loadBalancerIngresses));
+            var status = new V1IngressStatus(new V1IngressLoadBalancerStatus(loadBalancerIngresses?.Select(ingress => new V1IngressLoadBalancerIngress
+            {
+                Hostname = ingress.Hostname,
+                Ip = ingress.Ip,
+                Ports = ingress.Ports?.Select(port => new V1IngressPortStatus(port.Port, port.Protocol, port.Error)).ToArray()
+            }).ToArray()));
+
             var ingresses = _cache.GetIngresses().ToArray();
             foreach (var ingress in ingresses)
             {
                 _logger.LogInformation("Updating ingress {IngressClassNamespace}/{IngressClassName} status.", ingress.Metadata.NamespaceProperty, ingress.Metadata.Name);
-                var ingressStatus = await _client.NetworkingV1.ReadNamespacedIngressStatusAsync(ingress.Metadata.Name, ingress.Metadata.NamespaceProperty);
+                var ingressStatus = await _client.NetworkingV1.ReadNamespacedIngressStatusAsync(ingress.Metadata.Name, ingress.Metadata.NamespaceProperty, cancellationToken: cancellationToken);
                 ingressStatus.Status = status;
-                await _client.NetworkingV1.ReplaceNamespacedIngressStatusAsync(ingressStatus, ingress.Metadata.Name, ingress.Metadata.NamespaceProperty);
+                await _client.NetworkingV1.ReplaceNamespacedIngressStatusAsync(ingressStatus, ingress.Metadata.Name, ingress.Metadata.NamespaceProperty, cancellationToken: cancellationToken);
                 _logger.LogInformation("Updated ingress {IngressClassNamespace}/{IngressClassName} status.", ingress.Metadata.NamespaceProperty, ingress.Metadata.Name);
             }
         }

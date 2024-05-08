@@ -99,19 +99,21 @@ public class TelemetryConsumptionTests
         }
     }
 
-    [Theory (Skip = "https://github.com/microsoft/reverse-proxy/issues/1881")]
+    [Theory]
     [InlineData(RegistrationApproach.WithInstanceHelper)]
     [InlineData(RegistrationApproach.WithGenericHelper)]
     [InlineData(RegistrationApproach.Manual)]
     public async Task TelemetryConsumptionWorks(RegistrationApproach registrationApproach)
     {
-        var test = new TestEnvironment(
-            async context => await context.Response.WriteAsync("Foo"),
-            proxyBuilder => RegisterTelemetryConsumers(proxyBuilder.Services, registrationApproach),
-            proxyApp => { },
-            useHttpsOnDestination: true);
+        var useHttpsOnDestination = !OperatingSystem.IsMacOS();
 
-        test.ClusterId = Guid.NewGuid().ToString();
+        var test = new TestEnvironment(
+            async context => await context.Response.WriteAsync("Foo"))
+        {
+            UseHttpsOnDestination = useHttpsOnDestination,
+            ClusterId = Guid.NewGuid().ToString(),
+            ConfigureProxy = proxyBuilder => RegisterTelemetryConsumers(proxyBuilder.Services, registrationApproach),
+        };
 
         await test.Invoke(async uri =>
         {
@@ -121,6 +123,7 @@ public class TelemetryConsumptionTests
 
         var expected = new[]
         {
+            "OnConnectionStart-Kestrel",
             "OnRequestStart-Kestrel",
             "OnForwarderInvoke",
             "OnForwarderStart",
@@ -141,8 +144,14 @@ public class TelemetryConsumptionTests
             "OnForwarderStage-ResponseContentTransferStart",
             "OnContentTransferred",
             "OnForwarderStop",
-            "OnRequestStop-Kestrel"
+            "OnRequestStop-Kestrel",
+            "OnConnectionStop-Kestrel",
         };
+
+        if (!useHttpsOnDestination)
+        {
+            expected = expected.Where(s => !s.Contains("OnHandshake", StringComparison.Ordinal)).ToArray();
+        }
 
         foreach (var consumerType in new[] { typeof(TelemetryConsumer), typeof(SecondTelemetryConsumer) })
         {
@@ -157,12 +166,25 @@ public class TelemetryConsumptionTests
     [InlineData(RegistrationApproach.Manual)]
     public async Task NonProxyTelemetryConsumptionWorks(RegistrationApproach registrationApproach)
     {
-        var test = new TestEnvironment(
-            async context => await context.Response.WriteAsync("Foo"),
-            proxyBuilder => RegisterTelemetryConsumers(proxyBuilder.Services, registrationApproach),
-            proxyApp => { },
-            useHttpsOnDestination: true);
+        var redirected = false;
 
+        var test = new TestEnvironment(
+            async context =>
+            {
+                if (redirected)
+                {
+                    await context.Response.WriteAsync("Foo");
+                }
+                else
+                {
+                    context.Response.Redirect("/foo");
+                    redirected = true;
+                }
+            })
+        {
+            UseHttpsOnDestination = true,
+            ConfigureProxy = proxyBuilder => RegisterTelemetryConsumers(proxyBuilder.Services, registrationApproach),
+        };
         var path = $"/{Guid.NewGuid()}";
 
         await test.Invoke(async uri =>
@@ -182,7 +204,16 @@ public class TelemetryConsumptionTests
             "OnRequestHeadersStop",
             "OnResponseHeadersStart",
             "OnResponseHeadersStop",
-            "OnRequestStop"
+#if NET8_0_OR_GREATER
+            "OnRedirect",
+#endif
+            "OnRequestHeadersStart",
+            "OnRequestHeadersStop",
+            "OnResponseHeadersStart",
+            "OnResponseHeadersStop",
+            "OnResponseContentStart",
+            "OnResponseContentStop",
+            "OnRequestStop",
         };
 
         foreach (var consumerType in new[] { typeof(TelemetryConsumer), typeof(SecondTelemetryConsumer) })
@@ -243,6 +274,8 @@ public class TelemetryConsumptionTests
         public void OnRequestContentStop(DateTime timestamp, long contentLength) => AddStage(nameof(OnRequestContentStop), timestamp);
         public void OnResponseHeadersStart(DateTime timestamp) => AddStage(nameof(OnResponseHeadersStart), timestamp);
         public void OnResponseHeadersStop(DateTime timestamp) => AddStage(nameof(OnResponseHeadersStop), timestamp);
+        public void OnResponseContentStart(DateTime timestamp) => AddStage(nameof(OnResponseContentStart), timestamp);
+        public void OnResponseContentStop(DateTime timestamp) => AddStage(nameof(OnResponseContentStop), timestamp);
         public void OnResolutionStart(DateTime timestamp, string hostNameOrAddress) => AddStage(nameof(OnResolutionStart), timestamp);
         public void OnResolutionStop(DateTime timestamp) => AddStage(nameof(OnResolutionStop), timestamp);
         public void OnResolutionFailed(DateTime timestamp) => AddStage(nameof(OnResolutionFailed), timestamp);
@@ -252,8 +285,11 @@ public class TelemetryConsumptionTests
         public void OnConnectStart(DateTime timestamp, string address) => AddStage(nameof(OnConnectStart), timestamp);
         public void OnConnectStop(DateTime timestamp) => AddStage(nameof(OnConnectStop), timestamp);
         public void OnConnectFailed(DateTime timestamp, SocketError error, string exceptionMessage) => AddStage(nameof(OnConnectFailed), timestamp);
+        public void OnConnectionStart(DateTime timestamp, string connectionId, string localEndPoint, string remoteEndPoint) => AddStage($"{nameof(OnConnectionStart)}-Kestrel", timestamp);
         public void OnRequestStart(DateTime timestamp, string connectionId, string requestId, string httpVersion, string path, string method) => AddStage($"{nameof(OnRequestStart)}-Kestrel", timestamp);
         public void OnRequestStop(DateTime timestamp, string connectionId, string requestId, string httpVersion, string path, string method) => AddStage($"{nameof(OnRequestStop)}-Kestrel", timestamp);
+        public void OnConnectionStop(DateTime timestamp, string connectionId) => AddStage($"{nameof(OnConnectionStop)}-Kestrel", timestamp);
+        public void OnRedirect(DateTime timestamp, string redirectUri) => AddStage(nameof(OnRedirect), timestamp);
     }
 
     [Theory]
@@ -265,11 +301,11 @@ public class TelemetryConsumptionTests
         MetricsOptions.Interval = TimeSpan.FromMilliseconds(10);
 
         var test = new TestEnvironment(
-            async context => await context.Response.WriteAsync("Foo"),
-            proxyBuilder => RegisterMetricsConsumers(proxyBuilder.Services, registrationApproach),
-            proxyApp => { },
-            useHttpsOnDestination: true);
-
+            async context => await context.Response.WriteAsync("Foo"))
+        {
+            UseHttpsOnDestination = true,
+            ConfigureProxy = proxyBuilder => RegisterMetricsConsumers(proxyBuilder.Services, registrationApproach),
+        };
         var consumerBox = new MetricsConsumer.MetricsConsumerBox();
         MetricsConsumer.ScopeInstance.Value = consumerBox;
         MetricsConsumer consumer = null;

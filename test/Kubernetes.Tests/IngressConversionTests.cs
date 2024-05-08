@@ -46,17 +46,21 @@ public class IngressConversionTests
     [InlineData("mapped-port")]
     [InlineData("port-mismatch")]
     [InlineData("hostname-routing")]
+    [InlineData("multiple-hosts")]
     [InlineData("multiple-ingresses")]
     [InlineData("multiple-ingresses-one-svc")]
     [InlineData("multiple-namespaces")]
     [InlineData("route-metadata")]
+    [InlineData("route-queryparameters")]
     [InlineData("route-headers")]
     [InlineData("route-order")]
     [InlineData("missing-svc")]
+    [InlineData("port-diff-name")]
+    [InlineData("external-name-ingress")]
     public async Task ParsingTests(string name)
     {
         var ingressClass = KubeResourceGenerator.CreateIngressClass("yarp", "microsoft.com/ingress-yarp", true);
-        var cache = await GetKubernetesInfo(name, ingressClass).ConfigureAwait(false);
+        var cache = await GetKubernetesInfo(name, ingressClass);
         var configContext = new YarpConfigContext();
         var ingresses = cache.GetIngresses().ToArray();
 
@@ -80,7 +84,12 @@ public class IngressConversionTests
 
     private static void VerifyRoutes(string routesJson, string name)
     {
+#if NET7_0_OR_GREATER
         VerifyJson(routesJson, name, "routes.json");
+#else
+        VerifyJson(routesJson, name,
+            string.Equals("annotations", name, StringComparison.OrdinalIgnoreCase) ? "routes.net6.json" : "routes.json");
+#endif
     }
 
     private static string StripNullProperties(string json)
